@@ -79,6 +79,14 @@ function isSurveyStatus(status?: string | null): boolean {
   return status === 'survey_pending' || status === 'survey_feedback_pending';
 }
 
+
+function getFilterForConversation(conversation: InboxConversation | null): ConversationFilter {
+  if (!conversation) return 'active';
+  if (conversation.status === 'closed') return 'closed';
+  if (isSurveyStatus(conversation.status)) return 'survey';
+  return 'active';
+}
+
 function getFilterCount(conversations: InboxConversation[], filter: ConversationFilter): number {
   return conversations.filter((conversation) => matchesFilter(conversation, filter)).length;
 }
@@ -170,11 +178,25 @@ function getMessageSenderIcon(message: MessageRow) {
 }
 
 export function ConversationsInbox({ organizationId, conversations, selectedConversation, messages }: ConversationsInboxProps) {
-  const [filter, setFilter] = useState<ConversationFilter>('active');
+  const selectedId = selectedConversation?.id;
+  const [filter, setFilter] = useState<ConversationFilter>(() => getFilterForConversation(selectedConversation));
+  const previousSelectedIdRef = useRef<string | undefined>(selectedId);
   const [query, setQuery] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const selectedId = selectedConversation?.id;
   const { unreadByConversation, isRefreshing, lastRealtimeAt } = useInboxRealtime(organizationId, selectedId);
+
+  useEffect(() => {
+    const selectedChanged = previousSelectedIdRef.current !== selectedId;
+    if (!selectedChanged) return;
+
+    previousSelectedIdRef.current = selectedId;
+    if (!selectedConversation) return;
+
+    setFilter((currentFilter) => {
+      if (matchesFilter(selectedConversation, currentFilter)) return currentFilter;
+      return getFilterForConversation(selectedConversation);
+    });
+  }, [selectedId, selectedConversation]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
