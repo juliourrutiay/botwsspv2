@@ -20,7 +20,7 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { InboxConversation, MessageRow } from '@/lib/conversations/types';
 import { cn, formatDateTime } from '@/lib/utils';
 
-type ConversationFilter = 'active' | 'all' | 'pending_human' | 'bot_inactive' | 'survey' | 'closed';
+type ConversationFilter = 'active' | 'survey' | 'closed' | 'all';
 
 type ConversationsInboxProps = {
   organizationId: string;
@@ -30,9 +30,7 @@ type ConversationsInboxProps = {
 };
 
 const filters: Array<{ value: ConversationFilter; label: string }> = [
-  { value: 'active', label: 'Activas' },
-  { value: 'pending_human', label: 'Humano' },
-  { value: 'bot_inactive', label: 'Bot inactivo' },
+  { value: 'active', label: 'Activos' },
   { value: 'survey', label: 'Encuesta' },
   { value: 'closed', label: 'Cerradas' },
   { value: 'all', label: 'Todas' }
@@ -87,9 +85,7 @@ function getFilterCount(conversations: InboxConversation[], filter: Conversation
 
 function matchesFilter(conversation: InboxConversation, filter: ConversationFilter): boolean {
   if (filter === 'all') return true;
-  if (filter === 'active') return conversation.status !== 'closed';
-  if (filter === 'pending_human') return conversation.status === 'pending_human';
-  if (filter === 'bot_inactive') return conversation.bot_active === false && conversation.status !== 'closed';
+  if (filter === 'active') return conversation.status !== 'closed' && !isSurveyStatus(conversation.status);
   if (filter === 'survey') return isSurveyStatus(conversation.status);
   if (filter === 'closed') return conversation.status === 'closed';
   return true;
@@ -161,6 +157,18 @@ function useInboxRealtime(organizationId: string, selectedConversationId?: strin
   return { unreadByConversation, isRefreshing, lastRealtimeAt };
 }
 
+
+function getMessageSenderLabel(message: MessageRow, selectedConversation: InboxConversation): string {
+  if (message.sender === 'bot') return 'BOT';
+  if (message.sender === 'human') return 'AGENTE';
+  if (message.sender === 'system') return 'SISTEMA';
+  return getConversationName(selectedConversation).toUpperCase();
+}
+
+function getMessageSenderIcon(message: MessageRow) {
+  return message.sender === 'contact' ? <UserCircle size={14} weight="fill" /> : <Robot size={14} weight="fill" />;
+}
+
 export function ConversationsInbox({ organizationId, conversations, selectedConversation, messages }: ConversationsInboxProps) {
   const [filter, setFilter] = useState<ConversationFilter>('active');
   const [query, setQuery] = useState('');
@@ -196,14 +204,11 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
   const canFinalize = Boolean(selectedConversation && selectedConversation.status !== 'closed' && !selectedIsSurvey);
 
   return (
-    <div className="space-y-5">
-      <header className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className="space-y-4">
+      <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <p className="eyebrow">BOTCLÍNICA MVP</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight text-white">Conversaciones</h1>
-          <p className="mt-3 max-w-3xl text-[#9CA3AF]">
-            Bandeja operativa para monitorear WhatsApp en vivo, responder como humano y controlar el bot por conversación.
-          </p>
         </div>
         <div className="flex items-center gap-2 rounded-full border border-[#1F2937] bg-[#0D1117] px-4 py-2 text-xs font-semibold text-[#9CA3AF]">
           <Circle size={10} weight="fill" className={cn(lastRealtimeAt ? 'text-[#22C55E]' : 'text-[#6B7280]')} />
@@ -211,8 +216,8 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
         </div>
       </header>
 
-      <section className="grid min-h-[calc(100vh-210px)] overflow-hidden rounded-3xl border border-[#1F2937] bg-[#0B0F14] shadow-2xl shadow-black/20 xl:grid-cols-[390px_minmax(0,1fr)]">
-        <aside className="flex min-h-[420px] flex-col border-b border-[#1F2937] bg-[#070A0D] xl:border-b-0 xl:border-r">
+      <section className="grid h-[calc(100vh-175px)] min-h-[560px] overflow-hidden rounded-3xl border border-[#1F2937] bg-[#0B0F14] shadow-2xl shadow-black/20 xl:grid-cols-[390px_minmax(0,1fr)]">
+        <aside className="flex min-h-0 flex-col border-b border-[#1F2937] bg-[#070A0D] xl:border-b-0 xl:border-r">
           <div className="border-b border-[#1F2937] p-4">
             <div className="relative">
               <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" size={18} />
@@ -223,14 +228,14 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
                 className="pl-10"
               />
             </div>
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2 2xl:grid-cols-4">
               {filters.map((item) => (
                 <button
                   key={item.value}
                   type="button"
                   onClick={() => setFilter(item.value)}
                   className={cn(
-                    'whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-bold transition',
+                    'rounded-full border px-3 py-1.5 text-center text-xs font-bold transition',
                     filter === item.value
                       ? 'border-[#22C55E] bg-[#22C55E] text-[#031008]'
                       : 'border-[#1F2937] bg-[#111827] text-[#9CA3AF] hover:border-[#22C55E]/60 hover:text-white'
@@ -299,7 +304,7 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
           </div>
         </aside>
 
-        <main className="flex min-h-[620px] flex-col bg-gradient-to-b from-[#0B1220] to-[#070A0D]">
+        <main className="flex min-h-0 flex-col bg-gradient-to-b from-[#0B1220] to-[#070A0D]">
           {selectedConversation ? (
             <>
               <div className="flex flex-col gap-4 border-b border-[#1F2937] bg-[#0D1117]/80 p-5 xl:flex-row xl:items-center xl:justify-between">
@@ -340,7 +345,7 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
                 </form>
               </div>
 
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
                 {messages.map((message) => {
                   const outbound = message.direction === 'outbound';
                   const isBot = message.sender === 'bot';
@@ -358,8 +363,8 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
                         )}
                       >
                         <div className="mb-1 flex items-center gap-2 text-[11px] font-black uppercase tracking-wide opacity-70">
-                          {outbound ? <Robot size={14} weight="fill" /> : <UserCircle size={14} weight="fill" />}
-                          {message.sender}
+                          {getMessageSenderIcon(message)}
+                          {getMessageSenderLabel(message, selectedConversation)}
                         </div>
                         <p className="whitespace-pre-wrap">{message.content || 'Mensaje sin contenido textual'}</p>
                         <p className="mt-2 text-[10px] opacity-60">{formatDateTime(message.created_at)}</p>
