@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { Route } from 'next';
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowClockwise,
@@ -108,6 +108,18 @@ function getPayloadConversationId(value: unknown): string | null {
   return typeof id === 'string' ? id : null;
 }
 
+function getStoredScrollTop(key: string): number {
+  if (typeof window === 'undefined') return 0;
+  const value = window.sessionStorage.getItem(key);
+  const parsed = value ? Number(value) : 0;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function storeScrollTop(key: string, value: number) {
+  if (typeof window === 'undefined') return;
+  window.sessionStorage.setItem(key, String(Math.max(0, Math.round(value))));
+}
+
 function useInboxRealtime(organizationId: string, selectedConversationId?: string) {
   const router = useRouter();
   const [isRefreshing, startTransition] = useTransition();
@@ -181,8 +193,12 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
   const selectedId = selectedConversation?.id;
   const [filter, setFilter] = useState<ConversationFilter>(() => getFilterForConversation(selectedConversation));
   const previousSelectedIdRef = useRef<string | undefined>(selectedId);
+  const previousMessageConversationIdRef = useRef<string | undefined>(selectedId);
+  const previousMessageCountRef = useRef(messages.length);
   const [query, setQuery] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const listScrollRef = useRef<HTMLDivElement | null>(null);
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const listScrollStorageKey = `botclinica:conversation-list-scroll:${organizationId}`;
   const { unreadByConversation, isRefreshing, lastRealtimeAt } = useInboxRealtime(organizationId, selectedId);
 
   useEffect(() => {
@@ -198,8 +214,39 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
     });
   }, [selectedId, selectedConversation]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  useLayoutEffect(() => {
+    const scrollElement = listScrollRef.current;
+    if (!scrollElement) return;
+
+    const scrollTop = getStoredScrollTop(listScrollStorageKey);
+    if (scrollTop > 0) {
+      scrollElement.scrollTop = scrollTop;
+    }
+  }, [listScrollStorageKey, filter, selectedId]);
+
+  useLayoutEffect(() => {
+    const scrollElement = messagesScrollRef.current;
+    if (!scrollElement) return;
+
+    const selectedChanged = previousMessageConversationIdRef.current !== selectedId;
+    const previousMessageCount = previousMessageCountRef.current;
+
+    previousMessageConversationIdRef.current = selectedId;
+    previousMessageCountRef.current = messages.length;
+
+    if (selectedChanged) {
+      scrollElement.scrollTop = scrollElement.scrollHeight;
+      return;
+    }
+
+    if (messages.length > previousMessageCount) {
+      const distanceFromBottom = scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight;
+      const shouldStickToBottom = distanceFromBottom < 260;
+
+      if (shouldStickToBottom) {
+        scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
+      }
+    }
   }, [messages.length, selectedId]);
 
   const visibleConversations = useMemo(() => {
@@ -269,7 +316,11 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div
+            ref={listScrollRef}
+            onScroll={(event) => storeScrollTop(listScrollStorageKey, event.currentTarget.scrollTop)}
+            className="min-h-0 flex-1 overflow-y-auto"
+          >
             {visibleConversations.map((conversation) => {
               const isSelected = conversation.id === selectedId;
               const unreadCount = unreadByConversation[conversation.id] ?? 0;
@@ -280,6 +331,7 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
                 <Link
                   key={conversation.id}
                   href={`/conversaciones/${conversation.id}` as Route}
+                  scroll={false}
                   className={cn(
                     'block border-b border-[#1F2937] p-4 transition hover:bg-[#111827]/80',
                     isSelected && 'bg-[#111827] ring-1 ring-inset ring-[#22C55E]/40',
@@ -367,7 +419,7 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
                 </form>
               </div>
 
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
+              <div ref={messagesScrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
                 {messages.map((message) => {
                   const outbound = message.direction === 'outbound';
                   const isBot = message.sender === 'bot';
@@ -394,7 +446,6 @@ export function ConversationsInbox({ organizationId, conversations, selectedConv
                     </div>
                   );
                 })}
-                <div ref={messagesEndRef} />
               </div>
 
               <div className="border-t border-[#1F2937] bg-[#0D1117] p-4">
