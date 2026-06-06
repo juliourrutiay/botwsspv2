@@ -1,7 +1,10 @@
 import type { Database } from '@/lib/database.types';
 
 export type ConversationRow = Database['public']['Tables']['conversations']['Row'];
-export type ContactRow = Pick<Database['public']['Tables']['contacts']['Row'], 'full_name' | 'wa_phone'>;
+export type ContactRow = {
+  full_name: string | null;
+  wa_phone: string | null;
+};
 export type MessageRow = Database['public']['Tables']['messages']['Row'];
 
 export type LastMessagePreview = Pick<MessageRow, 'conversation_id' | 'content' | 'created_at' | 'direction' | 'sender'>;
