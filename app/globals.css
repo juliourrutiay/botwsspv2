@@ -84,3 +84,23 @@ button {
   padding: 0.25rem 0.65rem;
   font-size: 0.75rem;
 }
+
+
+.eyebrow {
+  color: var(--green);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.34em;
+}
+
+.btn-primary, .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary:disabled, .btn-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

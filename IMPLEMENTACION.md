@@ -649,6 +649,23 @@ Marca cada punto:
 
 ---
 
+
+---
+
+## Gestor de paquetes en Vercel
+
+Este proyecto fuerza el uso de `pnpm` en Vercel mediante `vercel.json`:
+
+```json
+{
+  "installCommand": "corepack enable && pnpm install --no-frozen-lockfile"
+}
+```
+
+No subas `package-lock.json` al repositorio. Si existe en GitHub, elimínalo. Vercel debe instalar con `pnpm`, no con `npm install`.
+
+Motivo: `npm install` puede fallar en Vercel con errores internos como `Exit handler never called`. Además, el lockfile npm anterior podía quedar acoplado a un entorno de instalación distinto.
+
 ## Ejecución local opcional
 
 Solo para desarrollo técnico:
@@ -663,41 +680,27 @@ En local tendrías que configurar `NEXT_PUBLIC_APP_URL=http://localhost:3000` y 
 
 ---
 
-## Importante: instalación de dependencias en Vercel
+## Fase adicional — Activar Realtime para conversaciones
 
-Para evitar errores de instalación, este proyecto debe subirse a GitHub sin lockfiles generados en otros entornos.
+Para que la bandeja `/conversaciones` se actualice sola cuando llegan mensajes nuevos de WhatsApp, debes habilitar Supabase Realtime para las tablas operativas.
 
-No debe existir en GitHub:
-
-```text
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
-```
-
-Debe existir en la raíz:
+1. Entra a Supabase.
+2. Abre tu proyecto.
+3. Ve a **SQL Editor**.
+4. Abre en el repositorio el archivo:
 
 ```text
-package.json
-.npmrc
-vercel.json
+supabase/migrations/0002_enable_realtime_conversations.sql
 ```
 
-En Vercel confirma:
+5. Copia todo el contenido.
+6. Ejecútalo una vez.
+
+Esto habilita Realtime para:
 
 ```text
-Settings → General → Node.js Version → 20.x
-Settings → General → Root Directory → raíz del repositorio
+public.conversations
+public.messages
 ```
 
-El comando de instalación está definido en `vercel.json`:
-
-```text
-npm install --no-audit --no-fund --legacy-peer-deps
-```
-
-Después de subir estos cambios, ejecuta:
-
-```text
-Deployments → Redeploy → Redeploy without Build Cache
-```
+Después de esto, cuando un cliente escriba por WhatsApp, la conversación subirá en el panel lateral y el chat seleccionado se actualizará sin refrescar manualmente.

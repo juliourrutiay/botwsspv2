@@ -86,6 +86,7 @@ export async function sendHumanMessageAction(formData: FormData) {
     .eq('id', conversationId)
     .eq('organization_id', organizationId);
 
+  revalidatePath('/conversaciones');
   revalidatePath(`/conversaciones/${conversationId}`);
 }
 
@@ -104,6 +105,7 @@ export async function toggleBotAction(formData: FormData) {
     .eq('id', conversationId)
     .eq('organization_id', organizationId);
 
+  revalidatePath('/conversaciones');
   revalidatePath(`/conversaciones/${conversationId}`);
 }
 
@@ -128,5 +130,6 @@ export async function finalizeConversationAction(formData: FormData) {
     triggeredBy: 'human'
   });
 
+  revalidatePath('/conversaciones');
   revalidatePath(`/conversaciones/${conversationId}`);
 }

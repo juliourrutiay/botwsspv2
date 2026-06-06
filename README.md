@@ -225,6 +225,23 @@ Si responde `200`, el job quedó correctamente protegido y funcionando.
 
 ---
 
+
+---
+
+## Gestor de paquetes en Vercel
+
+Este proyecto fuerza el uso de `pnpm` en Vercel mediante `vercel.json`:
+
+```json
+{
+  "installCommand": "corepack enable && pnpm install --no-frozen-lockfile"
+}
+```
+
+No subas `package-lock.json` al repositorio. Si existe en GitHub, elimínalo. Vercel debe instalar con `pnpm`, no con `npm install`.
+
+Motivo: `npm install` puede fallar en Vercel con errores internos como `Exit handler never called`. Además, el lockfile npm anterior podía quedar acoplado a un entorno de instalación distinto.
+
 ## Ejecución local opcional
 
 No es necesaria para tu flujo cloud-first, pero sirve para desarrollo técnico.
@@ -268,18 +285,20 @@ El MVP queda correcto cuando:
 
 ---
 
-## Nota importante sobre instalación en Vercel
+## Mejora de conversaciones en vivo
 
-Este repositorio no debe incluir `package-lock.json`, `pnpm-lock.yaml` ni `yarn.lock`.
+La pantalla `/conversaciones` funciona como una bandeja operativa tipo inbox:
 
-El lockfile anterior fue generado en un entorno externo y contenía referencias internas de registry, por lo que podía romper la instalación en Vercel antes de ejecutar `next build`.
+- panel lateral con conversaciones ordenadas por actividad reciente
+- detalle de chat a la derecha
+- filtros por activas, humano, bot inactivo, encuesta y cerradas
+- badge visual de mensajes nuevos mientras estás en otra conversación
+- actualización automática mediante Supabase Realtime
 
-Configuración recomendada en Vercel:
+Para que la actualización en vivo funcione, ejecuta también esta migración en Supabase SQL Editor si tu base ya fue creada antes de esta mejora:
 
 ```text
-Node.js Version: 20.x
-Root Directory: raíz del repositorio donde está package.json
-Install Command: npm install --no-audit --no-fund --legacy-peer-deps
+supabase/migrations/0002_enable_realtime_conversations.sql
 ```
 
-El comando de instalación queda fijado en `vercel.json`.
+Esta migración agrega las tablas `conversations` y `messages` a la publicación `supabase_realtime`.
